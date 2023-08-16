@@ -1,7 +1,8 @@
-import { Component } from '@angular/core';
+import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import {SelectionModel} from '@angular/cdk/collections';
 import {FlatTreeControl} from '@angular/cdk/tree';
+import { MatProgressBarModule } from '@angular/material/progress-bar';
 import { TreeControl } from '@angular/cdk/tree';
 import {MatTreeFlatDataSource, MatTreeFlattener, MatTreeModule, MatTreeNestedDataSource} from '@angular/material/tree';
 import {MatIconModule} from '@angular/material/icon';
@@ -9,47 +10,28 @@ import {MatInputModule} from '@angular/material/input';
 import {MatFormFieldModule} from '@angular/material/form-field';
 import {MatButtonModule} from '@angular/material/button';
 import { FormsModule } from '@angular/forms';
-
+import { HttpClient } from '@angular/common/http';
+import { TreedataService } from './treedata.service';
+// import { DataServiceService } from './data-service.service';
 
 interface FoodNode {
-  name: string;
-  children?: FoodNode[];
-}
-/** Flat node with expandable and level information */
-interface ExampleFlatNode {
-  expandable: boolean;
+
+  parentId: number;
+  id: number;
   name: string;
   level: number;
+  parent?: FoodNode;
+  children?: FoodNode[];
 }
 
-const TREE_DATA: FoodNode[] = [
-  {
-    name: 'Fruit',
-    children: [
-      {name: 'Apple'},
-      {name: 'Banana'},
-      {name: 'Fruit loops'},
-    ]
-  }, {
-    name: 'Vegetables',
-    children: [
-      {
-        name: 'Green',
-        children: [
-          {name: 'Broccoli'},
-          {name: 'Brussels sprouts'},
-        ]
-      }, {
-        name: 'Orange',
-        children: [
-          {name: 'Pumpkins'},
-          {name: 'Carrots'},
-        ]
-      },
-    ]
-  },
-];
-
+interface ExampleFlatNode {
+  parentId: number;
+  id: number;
+  expandable: boolean;
+  name: string;
+  children?: FoodNode[];
+  level: number;
+}
 
 
 @Component({
@@ -58,22 +40,46 @@ const TREE_DATA: FoodNode[] = [
   imports: [CommonModule,MatTreeModule,
     MatButtonModule,
     MatFormFieldModule,FormsModule,
-    MatInputModule,
-    MatIconModule,],
+    MatInputModule,MatProgressBarModule,
+    MatIconModule],
   templateUrl: './app.component.html',
-  styleUrls: ['./app.component.css']
-})
-export class AppComponent {
+  styleUrls: ['./app.component.css'],
 
-  constructor() {
-    this.dataSource.data = TREE_DATA;
+})
+export class AppComponent implements OnInit{
+  isLoading: boolean = true;
+
+  constructor(private tdService:TreedataService) {}
+
+  ngOnInit(): void {
+     this.fetchData();
   }
 
-   _transformer = (node: FoodNode, level: number) => {
+
+  fetchData(): void{
+    this.isLoading = true; // Show the progress bar
+    setTimeout(() => {
+      this.tdService.getData().subscribe(
+        (res) => {
+          this.dataSource.data = res.nestedData;
+          this.isLoading = false; // Hide the progress bar once data is fetched
+        },
+        (error) => {
+          console.error('Error fetching data:', error);
+          this.isLoading = false; // Hide the progress bar in case of an error
+        }
+      );
+    }, 1000);
+  }
+
+
+   _transformer = (node: FoodNode, level: number): ExampleFlatNode => {
     return {
       expandable: !!node.children && node.children.length > 0,
       name: node.name,
       level: level,
+      id: node.id,
+      parentId: node.parentId,
     };
   }
 
@@ -90,14 +96,14 @@ export class AppComponent {
   hasChild = (_: number, node: ExampleFlatNode) => node.expandable;
 
 
-findNodeByName(nodes: FoodNode[], nodeName: string): FoodNode | null {
+findNodeById(nodes: FoodNode[], nodeId: number): FoodNode | null {
   for (const node of nodes) {
-    if (node.name === nodeName) {
+    if (node.id === nodeId) {
       return node; // Return the node if it matches the provided name
     }
 
     if (node.children) {
-      const foundNode = this.findNodeByName(node.children, nodeName);
+      const foundNode = this.findNodeById(node.children, nodeId);
       if (foundNode) {
         return foundNode;
       }
@@ -107,62 +113,109 @@ findNodeByName(nodes: FoodNode[], nodeName: string): FoodNode | null {
   return null; // Node not found
 }
 
-deleteNode(node: ExampleFlatNode) {
-  const findAndDelete = (data: any[], nodeName: string): boolean => {
-    for (let i = 0; i < data.length; i++) {
-      if (data[i].name === nodeName) {
-        data.splice(i, 1);
-        return true;
-      } else if (data[i].children) {
-        const childDeleted = findAndDelete(data[i].children, nodeName);
-        if (childDeleted) return true;
+// Inside your AppComponent class
+deleteNode(node: FoodNode) {
+
+  console.log('node', node);
+
+
+  const confirmDelete = window.confirm('Are you sure you want to delete this node and its descendants?');
+
+  if (confirmDelete) {
+    this.tdService.deleteNode(node.id).subscribe(
+      () => {
+
+        // Remove the deleted node and its descendants from the frontend
+        const parentNode = this.findNodeById(this.dataSource.data, node.parentId);
+
+        console.log(parentNode);
+
+
+        if (parentNode && parentNode.children) {
+          const nodeIndex = parentNode.children.findIndex(child => child.id === node.id);
+          if (nodeIndex !== -1) {
+            parentNode.children.splice(nodeIndex, 1);
+            this.dataSource.data = [...this.dataSource.data];
+          }
+        }
+
+
+      },
+      (error) => {
+        console.error('Error deleting node:', error);
       }
-    }
-    return false;
-  };
-
-  findAndDelete(this.dataSource.data, node.name);
-
-  this.dataSource.data = [...this.dataSource.data];
+    );
+  }
 }
 
-addNode(node: ExampleFlatNode) {
+
+
+
+
+addNode(node: FoodNode) {
   const userInput = window.prompt('Please enter node name:', '');
 
   if (userInput !== null) {
-    const newNode: FoodNode = { name: userInput };
-    let parentNode = this.findNodeByName(this.dataSource.data, node.name);
+    const newNode: FoodNode = {
+      name: userInput,
+      parentId: node.id,
+      id: 0,
+      level: 0
+    };
 
-    if (parentNode) {
-      if (!parentNode.children) {
-        parentNode.children = [];
-        this.treeControl.expand(node);
+    const parentNode = this.findNodeById(this.dataSource.data, node.id);
+
+    this.tdService.addNode(newNode).subscribe(
+      (response) => {
+        if (parentNode) {
+          if (!parentNode.children) {
+            parentNode.children = [];
+
+          }
+
+          parentNode.children.push(response.data);
+          this.dataSource.data = [...this.dataSource.data];
+
+          this.fetchData();
+        }
+      },
+      (error) => {
+        console.error('Error adding node:', error);
       }
-      parentNode.children.push(newNode);
-      this.dataSource.data = [...this.dataSource.data];
-    } else {
-      window.alert('Invalid parent node.');
-    }
-  } else {
-    window.alert('Please enter a valid name.');
+    );
   }
 }
 
-editNode(node: ExampleFlatNode) {
+
+editNode(node: FoodNode) {
   const userInput = window.prompt('Please enter new node name:', '');
-  if (userInput !== null) {
-    const editedNode = this.findNodeByName(this.dataSource.data, node.name);
 
-    if (editedNode) {
-      editedNode.name = userInput;
-      this.dataSource.data = [...this.dataSource.data];
-    }
-  } else {
-    window.alert('Please enter a valid name');
+  if (userInput !== null) {
+    const editedNode: FoodNode = {
+      name: userInput,
+      parentId: node.parentId,
+      id: node.id,
+      level: 0
+    };
+
+    this.tdService.editNode(editedNode).subscribe(
+      () => {
+        // Update the node's name in the frontend
+        const foundNode = this.findNodeById(this.dataSource.data, node.id);
+        if (foundNode) {
+          foundNode.name = userInput;
+          this.dataSource.data = [...this.dataSource.data];
+
+          this.fetchData();
+
+        }
+      },
+      (error) => {
+        console.error('Error editing node:', error);
+      }
+    );
   }
 }
 
-
 }
-
 

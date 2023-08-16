@@ -1,6 +1,11 @@
 import { bootstrapApplication } from '@angular/platform-browser';
 import { appConfig } from './app/app.config';
 import { AppComponent } from './app/app.component';
+import { importProvidersFrom } from '@angular/core';
+import { HttpClientModule } from '@angular/common/http';
+import { provideAnimations, provideNoopAnimations } from '@angular/platform-browser/animations';
 
-bootstrapApplication(AppComponent, appConfig)
+bootstrapApplication(AppComponent, {
+  providers:[importProvidersFrom(HttpClientModule), provideAnimations(), provideNoopAnimations()]
+})
   .catch((err) => console.error(err));

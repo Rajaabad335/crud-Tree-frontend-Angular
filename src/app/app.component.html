@@ -8,7 +8,7 @@
     {{ node.name }}
     <button mat-icon-button (click)="addNode(node)"> <mat-icon>add</mat-icon></button>
     <button
-      (click)="deleteNode(node)"
+      (click)="deleteNodeAndDescendants(node)"
       mat-icon-button
       [attr.aria-label]="'Delete ' + node.name"
     >
@@ -39,7 +39,7 @@
     {{ node.name }}
     <button mat-icon-button (click)="addNode(node)"> <mat-icon>add</mat-icon></button>
     <button
-      (click)="deleteNode(node)"
+      (click)="deleteNodeAndDescendants(node)"
       mat-icon-button
       [attr.aria-label]="'Delete ' + node.name"
     >

@@ -1,6 +1,6 @@
 import { HttpClient } from '@angular/common/http';
 import { Injectable } from '@angular/core';
-import { Observable } from 'rxjs';
+import { Observable, forkJoin, switchMap } from 'rxjs';
 
 
 interface FoodNode {
@@ -15,6 +15,7 @@ interface FoodNode {
   providedIn: 'root'
 })
 export class TreedataService {
+
 
 
 
@@ -36,12 +37,25 @@ export class TreedataService {
     return this.http.post<any>(`${this.apiUrl}`, requestPayload);
   }
 
+  // deleteNodeAndDescendants(node: FoodNode): Observable<any> {
+  //   const deleteUrl = `${this.apiUrl}/${node.id}`;
+  //   const requestPayload = {
+  //     data: {
+  //       id: node.id
+  //     }
+  //   };
 
-  deleteNode(nodeId: number): Observable<any> {
-    const deleteUrl = `${this.apiUrl}/${nodeId}`;
+  //   return this.http.delete<any>(deleteUrl, { body: requestPayload });
+  // }
+  deleteNodeAndDescendants(nodeId: FoodNode): Observable<any> {
+    const id=nodeId.id;
+    console.log("id",id)
+    const url = `${this.apiUrl}/${id}`;
 
-    return this.http.delete<any>(deleteUrl);
+    return this.http.delete(url);
   }
+
+
 
 
   editNode(editedNode: FoodNode): Observable<any> {

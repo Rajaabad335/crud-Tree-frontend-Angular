@@ -49,6 +49,7 @@ interface ExampleFlatNode {
 export class AppComponent implements OnInit{
   isLoading: boolean = true;
 
+
   constructor(private tdService:TreedataService) {}
 
   ngOnInit(): void {
@@ -113,43 +114,6 @@ findNodeById(nodes: FoodNode[], nodeId: number): FoodNode | null {
   return null; // Node not found
 }
 
-// Inside your AppComponent class
-deleteNode(node: FoodNode) {
-
-  console.log('node', node);
-
-
-  const confirmDelete = window.confirm('Are you sure you want to delete this node and its descendants?');
-
-  if (confirmDelete) {
-    this.tdService.deleteNode(node.id).subscribe(
-      () => {
-
-        // Remove the deleted node and its descendants from the frontend
-        const parentNode = this.findNodeById(this.dataSource.data, node.parentId);
-
-        console.log(parentNode);
-
-
-        if (parentNode && parentNode.children) {
-          const nodeIndex = parentNode.children.findIndex(child => child.id === node.id);
-          if (nodeIndex !== -1) {
-            parentNode.children.splice(nodeIndex, 1);
-            this.dataSource.data = [...this.dataSource.data];
-          }
-        }
-
-
-      },
-      (error) => {
-        console.error('Error deleting node:', error);
-      }
-    );
-  }
-}
-
-
-
 
 
 addNode(node: FoodNode) {
@@ -185,6 +149,28 @@ addNode(node: FoodNode) {
     );
   }
 }
+
+
+
+deleteNodeAndDescendants(node: FoodNode) {
+  console.log(node);
+
+  if (confirm('Are you sure you want to delete this node and its descendants?')) {
+    this.tdService.deleteNodeAndDescendants(node).subscribe(
+      () => {
+        const parentNode = this.findNodeById(this.dataSource.data, node.id);
+
+          this.fetchData();
+
+      },
+      (error) => {
+        console.error('Error deleting node:', error);
+      }
+    );
+  }
+}
+
+
 
 
 editNode(node: FoodNode) {
